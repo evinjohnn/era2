@@ -1,0 +1,18 @@
+fastapi
+uvicorn
+python-dotenv
+groq
+gunicorn 
+faker
+# Vector Database and RAG Dependencies
+chromadb
+sentence-transformers
+numpy
+# Database Dependencies
+psycopg2-binary
+sqlalchemy
+alembic
+# Caching
+redis
+# Additional utilities
+pydantic-settings
