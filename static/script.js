@@ -1,134 +1,297 @@
-// static/script.js
-const chatMessagesDiv = document.getElementById('chat-messages');
-const productRecommendationsDiv = document.getElementById('product-recommendations');
-const userInput = document.getElementById('userInput');
-const sendButton = document.getElementById('sendButton');
-const micButton = document.getElementById('micButton');
-const actionButtonsContainer = document.getElementById('action-buttons-container');
+// /static/script.js
+document.addEventListener('DOMContentLoaded', () => {
+    const chatMessagesDiv = document.getElementById('chat-messages');
+    const userInput = document.getElementById('userInput');
+    const sendButton = document.getElementById('sendButton');
+    const chatInputArea = document.getElementById('chat-input-area');
+    const inputWrapper = document.getElementById('input-wrapper');
+    const interactiveBubblesContainer = document.getElementById('interactive-bubbles');
+    const menuCheckbox = document.getElementById('checkbox');
+    const menuOverlay = document.getElementById('overlay');
+    const resetConversationBtn = document.getElementById('reset-conversation-btn');
 
-let sessionId = localStorage.getItem('retailAiSessionId'); // Persist session ID in local storage
+    let sessionId = localStorage.getItem('retailAiSessionId');
 
-// Use a relative URL for production-readiness
-const API_URL = '/chat';
-
-function appendMessage(text, sender, isHTML = false) {
-    const messageDiv = document.createElement('div');
-    messageDiv.classList.add('message', sender);
-    if (isHTML) {
-        messageDiv.innerHTML = text;
-    } else {
-        messageDiv.textContent = text;
+    function updateGreeting() {
+        const greetingElement = document.getElementById('greeting-text');
+        if (!greetingElement) return;
+        const currentHour = new Date().getHours();
+        let greeting = 'Good Afternoon!';
+        if (currentHour < 12) greeting = 'Good Morning!';
+        else if (currentHour >= 17) greeting = 'Good Evening!';
+        greetingElement.textContent = greeting;
     }
-    chatMessagesDiv.appendChild(messageDiv);
-    chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight; // Auto-scroll
-}
 
-function displayProducts(products) {
-    productRecommendationsDiv.innerHTML = ''; // Clear previous products
-    if (!products || products.length === 0) return;
+    function scrollToBottom() {
+        chatMessagesDiv.scrollTo({ top: chatMessagesDiv.scrollHeight, behavior: 'smooth' });
+    }
 
-    products.forEach(product => {
-        const card = document.createElement('div');
-        card.classList.add('product-card');
-        card.innerHTML = `
-            <img src="${product.image_url}" alt="${product.name}">
-            <div class="product-name">${product.name}</div>
-            <div class="product-metal">${product.metal}</div>
-            <div class="product-price">$${product.price.toFixed(2)}</div>
-        `;
-        // Add event listener for card click to show details or select
-        card.addEventListener('click', () => {
-            // For now, just log or could send a message like "Tell me more about [product name]"
-            console.log("Clicked product:", product.name);
-            sendMessage(`Tell me more about ${product.id}`);
+    function createInitialView() {
+        if (chatMessagesDiv.querySelector('.message-wrapper') || chatMessagesDiv.querySelector('.welcome-card')) {
+            return;
+        }
+        const initialViewHTML = `
+            <div class="welcome-card animate__animated animate__fadeIn">
+                <div class="welcome-text">
+                    <h1 id="greeting-text">Good Afternoon!</h1>
+                    <p>I'm Joxy, your personal jewelry assistant. I'm here to help you with all your luxury jewelry needs.</p>
+                </div>
+                <div class="bot-avatar-container">
+                    <img src="/static/logo.png" alt="Joxy, the AI assistant">
+                </div>
+            </div>
+            <div class="quick-actions animate__animated animate__fadeInUp">
+                <button class="action-button" data-message="New Arrivals">
+                    <span class="material-symbols-outlined">diamond</span>
+                    <span>New Arrivals</span>
+                </button>
+                <button class="action-button" data-message="Show me rings">
+                    <span class="material-symbols-outlined">ring_volume</span>
+                    <span>Rings</span>
+                </button>
+                <button class="action-button" data-message="I need a gift">
+                    <span class="material-symbols-outlined">card_giftcard</span>
+                    <span>Find a Gift</span>
+                </button>
+                <button class="action-button" data-message="Help me choose">
+                    <span class="material-symbols-outlined">support_agent</span>
+                    <span>Help Me Choose</span>
+                </button>
+            </div>`;
+        chatMessagesDiv.innerHTML = initialViewHTML;
+        updateGreeting();
+        document.querySelectorAll('.action-button').forEach(button => {
+            button.addEventListener('click', () => {
+                const message = button.dataset.message;
+                sendMessage(message);
+            });
         });
-        productRecommendationsDiv.appendChild(card);
-    });
-}
+    }
 
-function displayActionButtons(buttons) {
-    actionButtonsContainer.innerHTML = '';
-    if (!buttons || buttons.length === 0) return;
+    function appendMessage(text, sender) {
+        if (sender === 'user' || chatMessagesDiv.children.length === 0) {
+            document.querySelector('.welcome-card')?.remove();
+            document.querySelector('.quick-actions')?.remove();
+        }
 
-    buttons.forEach(buttonInfo => {
-        const button = document.createElement('button');
-        button.textContent = buttonInfo.label;
-        button.addEventListener('click', () => {
-            sendMessage(buttonInfo.value); // Send the button's value as a message
-            actionButtonsContainer.innerHTML = ''; // Clear buttons after click
+        const wrapper = document.createElement('div');
+        wrapper.className = `message-wrapper ${sender} animate__animated animate__fadeInUp`;
+        wrapper.style.setProperty('--animate-duration', '0.5s');
+
+        if (sender === 'assistant') {
+            const avatar = document.createElement('img');
+            avatar.src = '/static/logo.png';
+            avatar.className = 'avatar';
+            wrapper.appendChild(avatar);
+        }
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${sender}`;
+        messageDiv.innerHTML = text.replace(/\n/g, '<br>');
+        
+        wrapper.appendChild(messageDiv);
+        chatMessagesDiv.appendChild(wrapper);
+        scrollToBottom();
+        return wrapper;
+    }
+
+    function showThinkingIndicator() {
+        document.querySelector('.welcome-card')?.remove();
+        document.querySelector('.quick-actions')?.remove();
+        const wrapper = document.createElement('div');
+        wrapper.className = 'message-wrapper assistant';
+        
+        const avatar = document.createElement('img');
+        avatar.src = '/static/logo.png';
+        avatar.className = 'avatar';
+        wrapper.appendChild(avatar);
+
+        const thinkingDiv = document.createElement('div');
+        thinkingDiv.className = 'message assistant thinking-animation';
+        thinkingDiv.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+        wrapper.appendChild(thinkingDiv);
+
+        chatMessagesDiv.appendChild(wrapper);
+        scrollToBottom();
+        return wrapper;
+    }
+
+    function displayProductCards(products) {
+        if (!products || products.length === 0) return;
+
+        const productContainer = document.createElement('div');
+        productContainer.className = 'product-cards-container';
+        
+        products.forEach(product => {
+            const card = document.createElement('div');
+            card.className = 'product-card animate__animated animate__fadeInUp';
+
+            const imageUrl = product.image_url || 'https://via.placeholder.com/200/cccccc/FFFFFF?Text=No+Image';
+            const name = product.name || 'Unnamed Product';
+            const price = (product.price || 0).toFixed(2);
+            const description = product.description || 'A beautiful piece of jewelry.';
+            const metal = product.metal || '';
+            const category = product.category || '';
+            const styleTags = Array.isArray(product.style_tags) ? product.style_tags : [];
+
+            card.innerHTML = `
+                <img src="${imageUrl}" alt="${name}" class="product-image">
+                <div class="product-info">
+                    <h3 class="product-name">${name}</h3>
+                    <p class="product-price">${price}</p>
+                    <p class="product-description">${description}</p>
+                    <div class="product-tags">
+                        ${metal ? `<span class="tag">${metal}</span>` : ''}
+                        ${category ? `<span class="tag">${category}</span>` : ''}
+                        ${styleTags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                    </div>
+                </div>
+            `;
+            productContainer.appendChild(card);
         });
-        actionButtonsContainer.appendChild(button);
-    });
-}
+        
+        chatMessagesDiv.appendChild(productContainer);
+        scrollToBottom();
+    }
 
-async function sendMessage(messageText) {
-    const trimmedMessage = messageText.trim();
-    if (!trimmedMessage) return; // Don't send empty messages
+    function displayInteractiveBubbles(options) {
+        interactiveBubblesContainer.innerHTML = '';
+        if (!options || options.length === 0) {
+            interactiveBubblesContainer.classList.add('hidden');
+            return;
+        };
 
-    // Don't display the initial handshake message to the user
-    if (trimmedMessage !== "hi_ai_assistant") {
+        interactiveBubblesContainer.classList.remove('hidden');
+        options.forEach(option => {
+            const button = document.createElement('button');
+            button.className = 'bubble-button';
+            button.textContent = option.label;
+            button.onclick = () => {
+                interactiveBubblesContainer.innerHTML = '';
+                sendMessage(option.value);
+            };
+            interactiveBubblesContainer.appendChild(button);
+        });
+    }
+
+    function setUiMode(mode) {
+        if (mode === 'chat') {
+            inputWrapper.classList.add('hidden');
+            interactiveBubblesContainer.classList.remove('hidden');
+        } else { // 'text_input_only'
+            inputWrapper.classList.remove('hidden');
+            inputWrapper.classList.add('animate__animated', 'animate__fadeInUp');
+            inputWrapper.style.setProperty('--animate-duration', '0.5s');
+            interactiveBubblesContainer.classList.add('hidden');
+            userInput.focus();
+        }
+    }
+
+    async function sendMessage(messageText) {
+        const trimmedMessage = String(messageText).trim();
+        if (!trimmedMessage) return;
+
+        // **MODIFICATION**: Handle special command to show input field
+        if (trimmedMessage === '__type__') {
+            setUiMode('text_input_only');
+            return;
+        }
+
         appendMessage(trimmedMessage, 'user');
+        userInput.value = '';
+        setUiMode('chat'); // Default to hiding input after sending
+        displayInteractiveBubbles([]);
+        const thinkingIndicator = showThinkingIndicator();
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId, message: trimmedMessage }),
+            });
+
+            thinkingIndicator.remove();
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            const data = await response.json();
+            
+            sessionId = data.session_id; // Always update session ID
+            localStorage.setItem('retailAiSessionId', sessionId);
+
+            if (data.reply) appendMessage(data.reply, 'assistant');
+            if (data.products && data.products.length > 0) {
+                displayProductCards(data.products);
+            }
+            if (data.interactive_options) {
+                displayInteractiveBubbles(data.interactive_options);
+            }
+            
+            setUiMode(data.ui_mode);
+
+        } catch (error) {
+            console.error('Error sending message:', error);
+            thinkingIndicator?.remove();
+            appendMessage('Sorry, I encountered an error. Please try again.', 'assistant');
+            setUiMode('text_input_only');
+        }
     }
-    
-    productRecommendationsDiv.innerHTML = ''; // Clear products when user sends a new message
-    userInput.value = '';
-    
-    // Show a thinking indicator if you want
-    // appendMessage("...", 'assistant-thinking'); 
 
-    try {
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                session_id: sessionId,
-                message: trimmedMessage,
-            }),
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+    async function startConversation(isReset = false) {
+        if (isReset) {
+            localStorage.removeItem('retailAiSessionId');
+            sessionId = null;
         }
 
-        const data = await response.json();
-
-        sessionId = data.session_id; // Update session ID (especially if it was new)
-        localStorage.setItem('retailAiSessionId', sessionId);
-
-        appendMessage(data.reply, 'assistant');
-        displayProducts(data.products);
-        displayActionButtons(data.action_buttons);
-
-        if (data.end_conversation) {
-            userInput.disabled = true;
-            sendButton.disabled = true;
-            micButton.disabled = true;
-            appendMessage("<em>Session ended. Please wait for staff or refresh to start a new session.</em>", "assistant", true);
+        try {
+            const response = await fetch('/start', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId })
+            });
+            if (!response.ok) throw new Error('Failed to start conversation');
+            const data = await response.json();
+            sessionId = data.session_id;
+            localStorage.setItem('retailAiSessionId', sessionId);
+            
+            // The /start endpoint now controls the first message.
+            // We only create the initial view if there are absolutely no messages.
+            if (isReset || chatMessagesDiv.children.length === 0) {
+                 chatMessagesDiv.innerHTML = ''; // Clear everything for a fresh start
+                 createInitialView();
+                 appendMessage(data.reply, 'assistant');
+            }
+            
+            setUiMode(data.ui_mode);
+            
+        } catch (error) {
+            console.error('Error starting conversation:', error);
+            appendMessage('Sorry, I am currently unavailable. Please try again later.', 'assistant');
         }
-
-    } catch (error) {
-        console.error('Error sending message:', error);
-        appendMessage('Sorry, I encountered an error. Please try again. If the problem persists, a staff member can assist you.', 'assistant');
     }
-}
 
-sendButton.addEventListener('click', () => sendMessage(userInput.value));
-userInput.addEventListener('keypress', (event) => {
-    if (event.key === 'Enter') {
-        sendMessage(userInput.value);
-    }
-});
+    // --- Event Listeners ---
+    sendButton.addEventListener('click', () => sendMessage(userInput.value));
+    userInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            sendMessage(userInput.value);
+        }
+    });
 
-micButton.addEventListener('click', () => {
-    appendMessage("Voice input is not implemented yet, but I appreciate your interest! Please type your message.", 'assistant');
-});
+    menuOverlay.addEventListener('click', () => {
+        if (menuCheckbox.checked) {
+            menuCheckbox.checked = false;
+        }
+    });
 
+    resetConversationBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (confirm('Are you sure you want to reset the conversation?')) {
+            menuCheckbox.checked = false;
+            startConversation(true);
+        }
+    });
 
-// Initial welcome message
-window.addEventListener('load', () => {
-    // Send an initial silent message to get the welcome from the bot
-    // Using a special keyword that the backend can recognize
-    sendMessage("hi_ai_assistant");
+    // Initialize the conversation on page load
+    startConversation();
 });
