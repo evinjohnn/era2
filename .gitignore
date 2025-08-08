@@ -12,4 +12,4 @@ venv/
 .idea/
 *.DS_Store.env
 chroma_db/
-.sentence_transformers_cache
+.sentence_transformers_cache/
