@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetConversationBtn = document.getElementById('reset-conversation-btn');
 
     let sessionId = localStorage.getItem('retailAiSessionId');
+    let isTyping = false;
 
     function updateGreeting() {
         const greetingElement = document.getElementById('greeting-text');
@@ -27,7 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createInitialView() {
-        if (chatMessagesDiv.querySelector('.message-wrapper') || chatMessagesDiv.querySelector('.welcome-card')) {
+        // Only create the initial view if no messages are present
+        if (chatMessagesDiv.querySelector('.message-wrapper')) {
             return;
         }
         const initialViewHTML = `
@@ -69,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function appendMessage(text, sender) {
-        if (sender === 'user' || chatMessagesDiv.children.length === 0) {
+        if (sender === 'user') {
             document.querySelector('.welcome-card')?.remove();
             document.querySelector('.quick-actions')?.remove();
         }
@@ -87,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${sender}`;
-        messageDiv.innerHTML = text.replace(/\n/g, '<br>');
+        messageDiv.innerHTML = text.replace(/\n/g, '<br>'); // Support newlines in bot responses
         
         wrapper.appendChild(messageDiv);
         chatMessagesDiv.appendChild(wrapper);
@@ -180,8 +182,6 @@ document.addEventListener('DOMContentLoaded', () => {
             interactiveBubblesContainer.classList.remove('hidden');
         } else { // 'text_input_only'
             inputWrapper.classList.remove('hidden');
-            inputWrapper.classList.add('animate__animated', 'animate__fadeInUp');
-            inputWrapper.style.setProperty('--animate-duration', '0.5s');
             interactiveBubblesContainer.classList.add('hidden');
             userInput.focus();
         }
@@ -191,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const trimmedMessage = String(messageText).trim();
         if (!trimmedMessage) return;
 
-        // **MODIFICATION**: Handle special command to show input field
+        // Special command from buttons to switch to typing
         if (trimmedMessage === '__type__') {
             setUiMode('text_input_only');
             return;
@@ -253,12 +253,10 @@ document.addEventListener('DOMContentLoaded', () => {
             sessionId = data.session_id;
             localStorage.setItem('retailAiSessionId', sessionId);
             
-            // The /start endpoint now controls the first message.
-            // We only create the initial view if there are absolutely no messages.
-            if (isReset || chatMessagesDiv.children.length === 0) {
-                 chatMessagesDiv.innerHTML = ''; // Clear everything for a fresh start
-                 createInitialView();
-                 appendMessage(data.reply, 'assistant');
+            if (isReset || !document.querySelector('.message-wrapper')) {
+                chatMessagesDiv.innerHTML = ''; // Clear everything for a fresh start
+                createInitialView();
+                appendMessage(data.reply, 'assistant');
             }
             
             setUiMode(data.ui_mode);
@@ -292,6 +290,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Initialize the conversation on page load
+    // Initialize
     startConversation();
 });
