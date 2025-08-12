@@ -14,6 +14,9 @@ import time
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Global product catalog to store original product data
+PRODUCT_CATALOG = []
+
 class VectorDatabase:
     def __init__(self, persist_directory: str = "./chroma_db"):
         self.persist_directory = persist_directory
@@ -47,9 +50,9 @@ class VectorDatabase:
             # Metadata must be JSON serializable and contain simple types
             metadata = {
                 'name': product.get('name', ''),
-                'category': product.get('attributes', {}).get('category', ''),
+                'category': product.get('category', ''),  # Fixed: category is at top level
                 'price': product.get('price', 0.0),
-                'metal': product.get('attributes', {}).get('metal', '')
+                'metal': product.get('metal', '')  # Fixed: metal is at top level
             }
             metadatas.append(metadata)
         
@@ -76,12 +79,21 @@ class VectorDatabase:
         return products
 
     def hybrid_search(self, query: str, preferences: Dict[str, Any], top_k: int = 5) -> List[Dict[str, Any]]:
-        filters = {}
-        if preferences.get('category'): filters['category'] = preferences['category']
-        if preferences.get('metal'): filters['metal'] = preferences['metal']
-        if preferences.get('budget_max'): filters['price'] = {"$lte": preferences['budget_max']}
+        # Build ChromaDB compatible filters
+        where_conditions = []
+        if preferences.get('category'): 
+            where_conditions.append({"category": {"$eq": preferences['category']}})
+        if preferences.get('metal'): 
+            where_conditions.append({"metal": {"$eq": preferences['metal']}})
+        if preferences.get('budget_max'): 
+            where_conditions.append({"price": {"$lte": preferences['budget_max']}})
         
-        enhanced_query = f"{query} {' '.join(preferences.values())}"
+        # Use $and operator to combine multiple conditions
+        filters = {"$and": where_conditions} if len(where_conditions) > 1 else where_conditions[0] if where_conditions else None
+        
+        # Convert all preference values to strings before joining
+        preference_text = ' '.join(str(v) for v in preferences.values())
+        enhanced_query = f"{query} {preference_text}"
         return self.semantic_search(enhanced_query, filters, top_k)
 
     def get_collection_stats(self) -> Dict[str, Any]:
@@ -99,6 +111,5 @@ def initialize_vector_database_with_products(products: List[Dict[str, Any]]) -> 
     global PRODUCT_CATALOG
     PRODUCT_CATALOG = products
     vdb = get_vector_database()
-    if vdb.collection.count() == 0 and products:
-        vdb.add_products(products)
+    vdb.add_products(products)
     return vdb

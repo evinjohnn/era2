@@ -1,132 +1,322 @@
-# generate_product_data.py
+#!/usr/bin/env python3
+"""
+Enhanced Product Database Generator
+Creates a comprehensive product catalog optimized for conversational e-commerce
+with rich tagging for RAG-based recommendations.
+"""
+
 import json
 import random
-import uuid
 from faker import Faker
+from typing import List, Dict, Any
 
+# Initialize Faker
 fake = Faker()
 
-CATEGORIES = ["ring", "necklace", "earrings", "bracelet"] # Start with these 4
-METALS = ["gold", "silver", "platinum", "rose gold", "white gold"]
-GEMSTONES = ["diamond", "sapphire", "ruby", "emerald", "pearl", "amethyst", "topaz", "garnet", "opal", "none", "cubic zirconia", "moissanite"]
-DESIGN_TYPES_RING = ["solitaire", "halo", "three-stone", "band", "cluster", "vintage inspired"]
-DESIGN_TYPES_NECKLACE = ["pendant", "chain", "locket", "choker", "station"]
-DESIGN_TYPES_EARRINGS = ["stud", "hoop", "drop", "chandelier", "cluster"]
-DESIGN_TYPES_BRACELET = ["chain", "bangle", "cuff", "charm", "tennis"]
-STYLES = ["classic", "modern", "vintage", "minimalist", "bohemian", "statement", "elegant", "delicate", "geometric", "bold"]
-OCCASIONS = ["anniversary", "birthday", "engagement", "wedding", "graduation", "formal", "casual", "gift", "everyday wear", "valentine", "mothers day"]
-RECIPIENTS = ["women", "unisex", "bride", "mother", "daughter", "girlfriend", "wife", "friend"] # Rings mostly for women in this example
+# Product categories and their variations
+CATEGORIES = {
+    'rings': {
+        'designs': ['solitaire', 'halo', 'three-stone', 'vintage', 'modern', 'classic', 'geometric', 'bohemian'],
+        'materials': ['gold', 'white gold', 'rose gold', 'platinum', 'silver'],
+        'gemstones': ['diamond', 'ruby', 'emerald', 'sapphire', 'pearl', 'moissanite', 'aquamarine', 'amethyst'],
+        'styles': ['elegant', 'romantic', 'sophisticated', 'minimalist', 'bold', 'delicate', 'timeless']
+    },
+    'necklaces': {
+        'designs': ['pendant', 'choker', 'layered', 'statement', 'minimalist', 'vintage', 'modern'],
+        'materials': ['gold', 'white gold', 'rose gold', 'platinum', 'silver', 'sterling silver'],
+        'gemstones': ['diamond', 'pearl', 'sapphire', 'ruby', 'emerald', 'opal', 'turquoise'],
+        'styles': ['elegant', 'romantic', 'sophisticated', 'casual', 'trendy', 'classic', 'bohemian']
+    },
+    'earrings': {
+        'designs': ['stud', 'hoop', 'drop', 'chandelier', 'cluster', 'vintage', 'modern'],
+        'materials': ['gold', 'white gold', 'rose gold', 'platinum', 'silver', 'sterling silver'],
+        'gemstones': ['diamond', 'pearl', 'sapphire', 'ruby', 'emerald', 'cubic zirconia'],
+        'styles': ['elegant', 'romantic', 'sophisticated', 'casual', 'trendy', 'classic', 'playful']
+    },
+    'bracelets': {
+        'designs': ['chain', 'bangle', 'charm', 'tennis', 'vintage', 'modern', 'stackable'],
+        'materials': ['gold', 'white gold', 'rose gold', 'platinum', 'silver', 'sterling silver'],
+        'gemstones': ['diamond', 'pearl', 'sapphire', 'ruby', 'emerald', 'crystal'],
+        'styles': ['elegant', 'romantic', 'sophisticated', 'casual', 'trendy', 'classic', 'charming']
+    }
+}
 
-def generate_product_name(category, metal, gemstones, style):
-    gem_name = random.choice(gemstones) if "none" not in gemstones else ""
-    if gem_name == "none": gem_name = ""
+# Occasion mappings
+OCCASION_MAPPINGS = {
+    'wedding': ['wedding', 'engagement', 'bridal', 'formal', 'romantic', 'celebration'],
+    'birthday': ['birthday', 'celebration', 'gift', 'personal', 'special'],
+    'anniversary': ['anniversary', 'romantic', 'love', 'celebration', 'milestone'],
+    'valentine': ['valentine', 'romantic', 'love', 'couples', 'romance'],
+    'christmas': ['christmas', 'holiday', 'gift', 'celebration', 'festive'],
+    'mother': ['mother', 'maternal', 'family', 'appreciation', 'love'],
+    'graduation': ['graduation', 'achievement', 'milestone', 'success', 'celebration']
+}
 
-    name_patterns = [
-        f"{random.choice(STYLES).capitalize()} {metal.capitalize()} {gem_name.capitalize()} {category.capitalize()}",
-        f"{fake.word().capitalize()} {gem_name.capitalize()} {metal.capitalize()} {category.capitalize()}",
-        f"{metal.capitalize()} {category.capitalize()} with {gem_name.capitalize()}",
-        f"The {fake.word().capitalize()} {style.capitalize()} {category.capitalize()}"
+# Recipient mappings
+RECIPIENT_MAPPINGS = {
+    'wife': ['wife', 'spouse', 'romantic', 'elegant', 'sophisticated', 'loving'],
+    'girlfriend': ['girlfriend', 'romantic', 'young', 'trendy', 'stylish', 'sweet'],
+    'mother': ['mother', 'parent', 'family', 'classic', 'timeless', 'caring'],
+    'daughter': ['daughter', 'family', 'young', 'trendy', 'sweet', 'loving'],
+    'friend': ['friend', 'casual', 'stylish', 'modern', 'fun', 'friendly'],
+    'sister': ['sister', 'family', 'sibling', 'close', 'loving', 'supportive'],
+    'myself': ['self', 'personal', 'individual', 'unique', 'self-care', 'indulgence']
+}
+
+def generate_product_name(category: str, design: str, gemstone: str, material: str) -> str:
+    """Generate a realistic product name."""
+    name_parts = []
+    
+    # Add design/style descriptor
+    if design in ['vintage', 'modern', 'classic', 'bohemian']:
+        name_parts.append(design.title())
+    
+    # Add material
+    if material == 'white gold':
+        name_parts.append('White Gold')
+    elif material == 'rose gold':
+        name_parts.append('Rose Gold')
+    else:
+        name_parts.append(material.title())
+    
+    # Add gemstone
+    if gemstone != 'none':
+        name_parts.append(gemstone.title())
+    
+    # Add category
+    name_parts.append(category.title())
+    
+    return ' '.join(name_parts)
+
+def generate_description(category: str, design: str, gemstone: str, material: str, style: str) -> str:
+    """Generate a realistic product description."""
+    descriptions = [
+        f"A beautiful {style} {category} featuring {gemstone} and crafted in {material}.",
+        f"Elegant {design} {category} design with {gemstone} accents in {material}.",
+        f"Stunning {style} {category} perfect for special occasions, made with {material} and {gemstone}.",
+        f"Timeless {design} {category} showcasing {gemstone} beauty in {material}.",
+        f"Exquisite {style} {category} with {gemstone} details, crafted in premium {material}."
     ]
-    if not gem_name: # Adjust patterns if no gemstone
-        name_patterns = [
-            f"{random.choice(STYLES).capitalize()} {metal.capitalize()} {category.capitalize()}",
-            f"{fake.word().capitalize()} {metal.capitalize()} {category.capitalize()}",
-            f"Elegant {metal.capitalize()} {category.capitalize()}"
-        ]
-    return random.choice(name_patterns).replace("  ", " ").strip()
+    return random.choice(descriptions)
 
+def generate_tags(category: str, design: str, gemstone: str, material: str, style: str, 
+                  occasion: str, recipient: str) -> List[str]:
+    """Generate comprehensive tags for the product."""
+    tags = []
+    
+    # Basic category and design tags
+    tags.extend([category, design, material, style])
+    
+    # Gemstone tags
+    if gemstone != 'none':
+        tags.append(gemstone)
+    
+    # Occasion tags
+    if occasion in OCCASION_MAPPINGS:
+        tags.extend(OCCASION_MAPPINGS[occasion])
+    
+    # Recipient tags
+    if recipient in RECIPIENT_MAPPINGS:
+        tags.extend(RECIPIENT_MAPPINGS[recipient])
+    
+    # Additional contextual tags
+    if occasion == 'wedding':
+        tags.extend(['bridal', 'formal', 'luxury'])
+    elif occasion == 'birthday':
+        tags.extend(['gift', 'personal', 'celebration'])
+    elif occasion == 'anniversary':
+        tags.extend(['romantic', 'love', 'milestone'])
+    
+    if recipient in ['wife', 'girlfriend']:
+        tags.extend(['romantic', 'couples'])
+    elif recipient in ['mother', 'daughter', 'sister']:
+        tags.extend(['family', 'loving'])
+    
+    # Style-specific tags
+    if style == 'elegant':
+        tags.extend(['sophisticated', 'refined'])
+    elif style == 'romantic':
+        tags.extend(['loving', 'sentimental'])
+    elif style == 'modern':
+        tags.extend(['contemporary', 'trendy'])
+    elif style == 'vintage':
+        tags.extend(['retro', 'classic'])
+    
+    # Remove duplicates while preserving order
+    unique_tags = []
+    for tag in tags:
+        if tag.lower() not in [t.lower() for t in unique_tags]:
+            unique_tags.append(tag)
+    
+    return unique_tags
 
-def get_design_types_for_category(category):
-    if category == "ring": return DESIGN_TYPES_RING
-    if category == "necklace": return DESIGN_TYPES_NECKLACE
-    if category == "earrings": return DESIGN_TYPES_EARRINGS
-    if category == "bracelet": return DESIGN_TYPES_BRACELET
-    return ["general", "unique"] # Fallback
+def generate_price(category: str, material: str, gemstone: str, design: str) -> float:
+    """Generate realistic pricing based on product attributes."""
+    base_price = 100.0
+    
+    # Material multiplier
+    material_multipliers = {
+        'silver': 1.0,
+        'gold': 2.5,
+        'white gold': 3.0,
+        'rose gold': 3.2,
+        'platinum': 4.0
+    }
+    
+    # Gemstone multiplier
+    gemstone_multipliers = {
+        'none': 0.8,
+        'cubic zirconia': 1.0,
+        'pearl': 1.2,
+        'crystal': 1.3,
+        'amethyst': 1.5,
+        'aquamarine': 1.8,
+        'turquoise': 2.0,
+        'opal': 2.2,
+        'emerald': 3.0,
+        'ruby': 3.5,
+        'sapphire': 3.8,
+        'diamond': 5.0,
+        'moissanite': 2.5
+    }
+    
+    # Design complexity multiplier
+    design_multipliers = {
+        'minimalist': 0.8,
+        'classic': 1.0,
+        'modern': 1.2,
+        'vintage': 1.3,
+        'geometric': 1.4,
+        'bohemian': 1.5,
+        'halo': 1.8,
+        'three-stone': 2.0,
+        'chandelier': 2.2,
+        'statement': 2.5
+    }
+    
+    # Category base price
+    category_base = {
+        'rings': 200,
+        'necklaces': 150,
+        'earrings': 120,
+        'bracelets': 100
+    }
+    
+    base_price = category_base.get(category, 150)
+    
+    # Calculate final price
+    price = base_price
+    price *= material_multipliers.get(material, 1.0)
+    price *= gemstone_multipliers.get(gemstone, 1.0)
+    price *= design_multipliers.get(design, 1.0)
+    
+    # Add some randomness
+    price *= random.uniform(0.8, 1.2)
+    
+    # Round to nearest dollar
+    return round(price, 2)
 
-def generate_products(num_per_category=55): # Aiming for 200+ (55 * 4 = 220)
+def generate_product(category: str, product_id: str) -> Dict[str, Any]:
+    """Generate a single product with all attributes."""
+    category_info = CATEGORIES[category]
+    
+    # Randomly select attributes
+    design = random.choice(category_info['designs'])
+    material = random.choice(category_info['materials'])
+    gemstone = random.choice(category_info['gemstones'] + ['none'])
+    style = random.choice(category_info['styles'])
+    
+    # Randomly select occasion and recipient
+    occasion = random.choice(list(OCCASION_MAPPINGS.keys()))
+    recipient = random.choice(list(RECIPIENT_MAPPINGS.keys()))
+    
+    # Generate product details
+    name = generate_product_name(category, design, gemstone, material)
+    description = generate_description(category, design, gemstone, material, style)
+    price = generate_price(category, material, gemstone, design)
+    tags = generate_tags(category, design, gemstone, material, style, occasion, recipient)
+    
+    # Generate image URL (placeholder)
+    image_url = f"https://via.placeholder.com/300x300/random?text={category.title()}"
+    
+    return {
+        'id': product_id,
+        'name': name,
+        'category': category,
+        'image_url': image_url,
+        'price': price,
+        'metal': material,
+        'gemstones': [gemstone] if gemstone != 'none' else [],
+        'design_type': design,
+        'style_tags': [style],
+        'occasion_tags': [occasion],
+        'recipient_tags': [recipient],
+        'tags': tags,
+        'description': description
+    }
+
+def generate_product_catalog(num_products: int = 1000) -> List[Dict[str, Any]]:
+    """Generate a complete product catalog."""
     products = []
-    product_id_counter = 1
-
-    for category in CATEGORIES:
-        for i in range(num_per_category):
-            product_id_prefix = category.upper()[:3]
-            item_id = f"{product_id_prefix}{str(product_id_counter).zfill(3)}"
-            product_id_counter += 1
-
-            metal = random.choice(METALS)
-            
-            # Gemstones: 70% chance of having one, 20% two, 10% none (unless 'none' is picked)
-            num_gems = 1
-            if category not in ["bracelet"]: # Bracelets less likely to be gemstone-focused in this simple gen
-                rand_gem_chance = random.random()
-                if rand_gem_chance < 0.10: # 10% chance of no gemstone focus
-                    current_gemstones = ["none"]
-                elif rand_gem_chance < 0.80: # 70% chance of one gemstone
-                    current_gemstones = [random.choice([g for g in GEMSTONES if g != "none"])]
-                else: # 20% chance of two different gemstones
-                    current_gemstones = random.sample([g for g in GEMSTONES if g != "none"], k=min(2, len(GEMSTONES)-1) )
-            else:
-                current_gemstones = ["none"] if random.random() < 0.5 else [random.choice([g for g in GEMSTONES if g != "none"])]
-
-
-            style_tags = random.sample(STYLES, k=random.randint(1, 3))
-            occasion_tags = random.sample(OCCASIONS, k=random.randint(1, 4))
-            recipient_tags = random.sample(RECIPIENTS, k=random.randint(1,2)) if category != "men_specific" else ["men"] # adjust if adding men's categories
-
-            name = generate_product_name(category, metal, current_gemstones, random.choice(style_tags))
-            
-            # Price range based on metal and gemstones
-            base_price = random.uniform(50, 500)
-            if "gold" in metal: base_price *= random.uniform(1.5, 3)
-            if "platinum" in metal: base_price *= random.uniform(2, 4)
-            if "diamond" in current_gemstones: base_price *= random.uniform(2, 5)
-            if "sapphire" in current_gemstones or "ruby" in current_gemstones or "emerald" in current_gemstones:
-                base_price *= random.uniform(1.5, 3)
-            if len(current_gemstones) > 1 and "none" not in current_gemstones : base_price *= 1.3
-            price = round(base_price, 2)
-            if price < 20: price = round(random.uniform(19.99, 49.99),2) # Min price
-            if price > 10000: price = round(random.uniform(5000, 9999.99),2) # Max price cap for this gen
-
-            design_type_list = get_design_types_for_category(category)
-            design_type = random.choice(design_type_list)
-            
-            description = f"{fake.sentence(nb_words=5)} {name.lower()}. {fake.sentence(nb_words=8)}"
-            if "diamond" in current_gemstones:
-                description += f" Features sparkling diamonds."
-            if "vintage" in style_tags:
-                description += " A piece with timeless vintage charm."
-
-
-            product = {
-                "id": item_id,
-                "name": name,
-                "category": category,
-                "image_url": f"https://via.placeholder.com/200/{fake.hex_color()[1:]}/FFFFFF?Text={category.replace(' ', '+')}",
-                "price": price,
-                "metal": metal,
-                "gemstones": current_gemstones, # Added this field
-                "design_type": design_type,
-                "style_tags": style_tags, # Added this field
-                "occasion_tags": occasion_tags,
-                "recipient_tags": recipient_tags, # Added this field
-                "description": description
-            }
+    
+    # Ensure we have a good distribution across categories
+    categories = list(CATEGORIES.keys())
+    products_per_category = num_products // len(categories)
+    
+    for i, category in enumerate(categories):
+        start_id = i * products_per_category + 1
+        
+        for j in range(products_per_category):
+            product_id = f"{category[:3].upper()}{start_id + j:03d}"
+            product = generate_product(category, product_id)
             products.append(product)
-            
+    
+    # Add some extra products to reach the target number
+    remaining = num_products - len(products)
+    for i in range(remaining):
+        category = random.choice(categories)
+        product_id = f"{category[:3].upper()}{len(products) + 1:03d}"
+        product = generate_product(category, product_id)
+        products.append(product)
+    
     return products
 
-if __name__ == "__main__":
-    generated_product_list = generate_products(num_per_category=55) # Generate 55 for each of the 4 categories = 220
+def main():
+    """Main function to generate and save the product catalog."""
+    print("Generating enhanced product catalog for conversational e-commerce...")
     
-    # Option 1: Print as a Python list string to paste into your main file
-    # print("PRODUCT_CATALOG_DB = [")
-    # for i, product in enumerate(generated_product_list):
-    #     print(f"    {json.dumps(product)},")
-    # print("]")
+    # Generate products
+    products = generate_product_catalog(1000)
+    
+    # Save to file
+    output_file = "product_catalog_large.json"
+    with open(output_file, 'w') as f:
+        json.dump(products, f, indent=2)
+    
+    print(f"Generated {len(products)} products and saved to {output_file}")
+    
+    # Print some statistics
+    categories = {}
+    occasions = {}
+    recipients = {}
+    
+    for product in products:
+        cat = product['category']
+        categories[cat] = categories.get(cat, 0) + 1
+        
+        occ = product['occasion_tags'][0] if product['occasion_tags'] else 'none'
+        occasions[occ] = occasions.get(occ, 0) + 1
+        
+        rec = product['recipient_tags'][0] if product['recipient_tags'] else 'none'
+        recipients[rec] = recipients.get(rec, 0) + 1
+    
+    print("\nProduct Distribution:")
+    print("Categories:", dict(sorted(categories.items())))
+    print("Occasions:", dict(sorted(occasions.items())))
+    print("Recipients:", dict(sorted(recipients.items())))
+    
+    print(f"\nPrice Range: ${min(p['price'] for p in products):.2f} - ${max(p['price'] for p in products):.2f}")
+    print(f"Average Price: ${sum(p['price'] for p in products) / len(products):.2f}")
 
-    # Option 2: Save to a JSON file
-    with open("product_catalog_large.json", "w") as f:
-        json.dump(generated_product_list, f, indent=4)
-    
-    print(f"Generated {len(generated_product_list)} products and saved to product_catalog_large.json")
-    print(f"Example product: {random.choice(generated_product_list)}")
+if __name__ == "__main__":
+    main()

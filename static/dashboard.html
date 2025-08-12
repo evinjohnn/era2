@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Joxy - Analytics Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lora:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background: #f4f7f9; } /* Override kiosk background for dashboard */
+    </style>
+</head>
+<body class="dashboard-body">
+    <div class="dashboard-container">
+        <div class="dashboard-card full-width">
+            <h2>Joxy AI Assistant - Performance Dashboard</h2>
+        </div>
+
+        <!-- Conversation Metrics -->
+        <div class="dashboard-card">
+            <h2>Total Sessions (24h)</h2>
+            <p id="total-sessions" class="metric">--</p>
+            <p class="metric-label">Conversations started</p>
+        </div>
+        <div class="dashboard-card">
+            <h2>Avg. Session Duration</h2>
+            <p id="avg-duration" class="metric">--s</p>
+            <p class="metric-label">Average time per conversation</p>
+        </div>
+        <div class="dashboard-card">
+            <h2>Staff Handoff Rate</h2>
+            <p id="handoff-rate" class="metric">--%</p>
+            <p class="metric-label">Sessions requiring human help</p>
+        </div>
+
+        <!-- Peak Hours Chart -->
+        <div class="dashboard-card full-width">
+            <h2>Peak Conversation Hours</h2>
+            <div class="chart-container">
+                <canvas id="peakHoursChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Product Metrics -->
+        <div class="dashboard-card">
+            <h2>Top Recommended Products</h2>
+            <div class="table-container">
+                <table id="top-products-table">
+                    <thead><tr><th>Product Name</th><th>Count</th></tr></thead>
+                    <tbody><tr><td colspan="2">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="dashboard-card">
+            <h2>Recommendation by Category</h2>
+            <div class="chart-container">
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+        <div class="dashboard-card">
+            <h2>Recommendation by Price Range</h2>
+            <div class="chart-container">
+                <canvas id="priceRangeChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchDashboardData();
+        });
+
+        async function fetchDashboardData() {
+            try {
+                const response = await fetch('/staff/api/dashboard-data');
+                if (!response.ok) throw new Error('Failed to fetch dashboard data');
+                const data = await response.json();
+
+                populateConversationMetrics(data.conversation_metrics);
+                createPeakHoursChart(data.user_behavior_metrics.peak_hours);
+                populateProductMetrics(data.product_metrics);
+
+            } catch (error) {
+                console.error("Error fetching dashboard data:", error);
+                // Display error state on the dashboard
+            }
+        }
+
+        function populateConversationMetrics(metrics) {
+            document.getElementById('total-sessions').textContent = metrics.total_sessions;
+            document.getElementById('avg-duration').textContent = `${metrics.average_session_duration.toFixed(1)}s`;
+            document.getElementById('handoff-rate').textContent = `${(metrics.handoff_rate * 100).toFixed(1)}%`;
+        }
+        
+        function populateProductMetrics(metrics) {
+            // Top Products Table
+            const topProductsTable = document.querySelector('#top-products-table tbody');
+            topProductsTable.innerHTML = '';
+            metrics.top_recommended_products.forEach(product => {
+                const row = topProductsTable.insertRow();
+                row.insertCell(0).textContent = product.product_name;
+                row.insertCell(1).textContent = product.recommendation_count;
+            });
+
+            // Category Chart
+            createPieChart('categoryChart', metrics.category_breakdown, 'Recommendations by Category');
+            
+            // Price Range Chart
+            createBarChart('priceRangeChart', metrics.price_range_breakdown, 'Recommendations by Price Range');
+        }
+
+        function createPeakHoursChart(peakHoursData) {
+            const ctx = document.getElementById('peakHoursChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
+                    datasets: [{
+                        label: 'Conversations per Hour',
+                        data: peakHoursData,
+                        borderColor: 'rgba(140, 74, 74, 0.8)',
+                        backgroundColor: 'rgba(140, 74, 74, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function createPieChart(canvasId, data, title) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(data),
+                    datasets: [{
+                        label: title,
+                        data: Object.values(data),
+                        backgroundColor: [
+                            '#8C4A4A', '#A1665E', '#B68272', '#CC9E86', '#E1B99A', '#F5D5AE'
+                        ],
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+        }
+        
+        function createBarChart(canvasId, data, title) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data),
+                    datasets: [{
+                        label: title,
+                        data: Object.values(data),
+                        backgroundColor: '#A1665E',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>

@@ -15,15 +15,97 @@
         <header>
             <span class="logo material-symbols-outlined">diamond</span>
             <h1>AI Shopping Assistant</h1>
+            <div class="header-actions">
+                <button id="dashboardButton" class="icon-button" title="Dashboard">
+                    <span class="material-symbols-outlined">dashboard</span>
+                </button>
+                <button id="newConversationButton" class="icon-button" title="Start New Conversation">
+                    <span class="material-symbols-outlined">refresh</span>
+                </button>
+            </div>
         </header>
        
-        <div class="chat-window">
+        <!-- Welcome Card -->
+        <div id="welcomeCard" class="welcome-card">
+            <div class="welcome-header">
+                <span class="welcome-icon material-symbols-outlined">waving_hand</span>
+                <h2>Welcome to AI Shopping Assistant</h2>
+                <p>Your personal guide to finding the perfect jewelry</p>
+            </div>
+            <div class="welcome-actions">
+                <button class="welcome-action-btn primary" onclick="startShopping()">
+                    <span class="material-symbols-outlined">shopping_bag</span>
+                    Start Shopping
+                </button>
+                <button class="welcome-action-btn secondary" onclick="showDashboard()">
+                    <span class="material-symbols-outlined">dashboard</span>
+                    Dashboard
+                </button>
+            </div>
+            <div class="welcome-decoration">
+                <div class="floating-shape shape-1"></div>
+                <div class="floating-shape shape-2"></div>
+                <div class="floating-shape shape-3"></div>
+            </div>
+        </div>
+
+        <!-- Dashboard Panel -->
+        <div id="dashboardPanel" class="dashboard-panel hidden">
+            <div class="dashboard-header">
+                <h3>Dashboard</h3>
+                <button id="closeDashboard" class="icon-button small">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="dashboard-content">
+                <div class="dashboard-section">
+                    <h4>Quick Actions</h4>
+                    <div class="action-grid">
+                        <button class="dashboard-action" onclick="trackOrder()">
+                            <span class="material-symbols-outlined">local_shipping</span>
+                            <span>Track Order</span>
+                            <div class="action-badge">New</div>
+                        </button>
+                        <button class="dashboard-action" onclick="viewCollections()">
+                            <span class="material-symbols-outlined">collections</span>
+                            <span>Collections</span>
+                        </button>
+                        <button class="dashboard-action" onclick="viewWishlist()">
+                            <span class="material-symbols-outlined">favorite</span>
+                            <span>Wishlist</span>
+                            <div class="action-badge">3</div>
+                        </button>
+                        <button class="dashboard-action" onclick="viewHistory()">
+                            <span class="material-symbols-outlined">history</span>
+                            <span>History</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="dashboard-section">
+                    <h4>Recent Activity</h4>
+                    <div class="activity-list">
+                        <div class="activity-item">
+                            <span class="activity-icon material-symbols-outlined">search</span>
+                            <span class="activity-text">Searched for wedding rings</span>
+                            <span class="activity-time">2 min ago</span>
+                        </div>
+                        <div class="activity-item">
+                            <span class="activity-icon material-symbols-outlined">favorite</span>
+                            <span class="activity-text">Added ring to wishlist</span>
+                            <span class="activity-time">5 min ago</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+       
+        <div class="chat-window hidden" id="chatWindow">
             <div id="chat-messages" class="chat-messages">
                 <!-- Messages will appear here -->
             </div>
         </div>
        
-        <div class="chat-input-area">
+        <div class="chat-input-area hidden" id="chatInputArea">
             <div id="product-recommendations" class="product-recommendations">
                 <!-- Product cards will appear here -->
             </div>
