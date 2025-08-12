@@ -109,6 +109,7 @@ header h1 {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 12px;
     padding-top: 16px;
+    margin-bottom: 12px;
 }
 
 .product-card {
@@ -134,7 +135,7 @@ header h1 {
     object-fit: cover;
     border-radius: 12px;
     margin-bottom: 12px;
-    background-color: var(--md-surface-variant); /* Placeholder color */
+    background-color: var(--md-surface-variant);
 }
 
 .product-card .product-name {
@@ -172,23 +173,26 @@ header h1 {
     margin-bottom: 12px;
     flex-wrap: wrap;
     padding: 0 4px;
+    justify-content: center;
 }
 
 .action-buttons-container button {
-    padding: 8px 16px;
+    padding: 10px 20px;
     background-color: var(--md-secondary-container);
     color: var(--md-on-secondary-container);
-    border: none;
+    border: 1px solid var(--md-outline);
     border-radius: 20px;
     cursor: pointer;
     font-size: 0.9em;
     font-weight: 500;
-    transition: background-color 0.2s ease;
+    transition: all 0.2s ease;
 }
 
 .action-buttons-container button:hover {
-    background-color: var(--md-tertiary-container);
-    color: var(--md-on-tertiary-container);
+    background-color: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    border-color: var(--md-on-primary-container);
+    transform: translateY(-2px);
 }
 
 .input-wrapper {
@@ -238,24 +242,6 @@ header h1 {
     font-size: 20px;
 }
 
-.icon-button:disabled {
-    background-color: var(--md-surface-variant) !important;
-    color: var(--md-outline) !important;
-    cursor: not-allowed;
-    transform: none;
-}
-
-button#micButton {
-    background-color: var(--md-secondary-container);
-    color: var(--md-on-secondary-container);
-}
-
-button#micButton:hover:not(:disabled) {
-    background-color: var(--md-tertiary-container);
-    color: var(--md-on-tertiary-container);
-    transform: scale(1.05);
-}
-
 button#sendButton {
     background-color: var(--md-primary-container);
     color: var(--md-on-primary-container);
@@ -273,8 +259,8 @@ button#sendButton:hover:not(:disabled) {
 @media (max-width: 600px) {
     .kiosk-container {
         width: 100%;
-        height: 100%;
-        max-height: 100%;
+        height: 100vh;
+        max-height: 100vh;
         border-radius: 0;
         border: none;
     }
