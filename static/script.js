@@ -7,21 +7,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const newConversationButton = document.getElementById('newConversationButton');
     const dashboardButton = document.getElementById('dashboardButton');
     const welcomeCard = document.getElementById('welcomeCard');
-    const dashboardPanel = document.getElementById('dashboardPanel');
     const chatWindow = document.getElementById('chatWindow');
     const chatInputArea = document.getElementById('chatInputArea');
-    const closeDashboard = document.getElementById('closeDashboard');
 
     let sessionId = localStorage.getItem('aiAssistantSessionId');
     const API_URL = '/chat';
-
-    // Global functions for onclick handlers
-    window.startShopping = startShopping;
-    window.showDashboard = showDashboard;
-    window.trackOrder = trackOrder;
-    window.viewCollections = viewCollections;
-    window.viewWishlist = viewWishlist;
-    window.viewHistory = viewHistory;
 
     function setInputState(enabled, placeholder = "Type your answer...") {
         userInput.disabled = !enabled;
@@ -64,7 +54,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         options.forEach(option => {
             const button = document.createElement('button');
-            button.classList.add('action-button');
             button.textContent = option.label;
             button.addEventListener('click', () => {
                 appendMessage(option.label, 'user');
@@ -75,11 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function sendMessage(messageText) {
-        // Handle empty or null messages for initial greeting
-        const trimmedMessage = messageText ? messageText.trim() : "";
-        
-        // Only show the user's message if it's not empty
-        if (trimmedMessage) {
+        const isInitialHandshake = (messageText === null);
+        const trimmedMessage = isInitialHandshake ? "" : messageText.trim();
+
+        if (!isInitialHandshake && !trimmedMessage) return;
+
+        if (!isInitialHandshake) {
             appendMessage(trimmedMessage, 'user');
         }
 
@@ -92,10 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    session_id: sessionId,
-                    message: trimmedMessage,
-                }),
+                body: JSON.stringify({ session_id: sessionId, message: trimmedMessage }),
             });
 
             if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
@@ -105,17 +92,10 @@ document.addEventListener('DOMContentLoaded', () => {
             sessionId = data.session_id;
             localStorage.setItem('aiAssistantSessionId', sessionId);
 
-            if (data.reply) {
-                appendMessage(data.reply, 'assistant');
-            }
-            if (data.products) {
-                displayProducts(data.products);
-            }
-            if (data.action_buttons) {
-                displayActionButtons(data.action_buttons);
-            } else {
-                setInputState(true);
-            }
+            if (data.reply) appendMessage(data.reply, 'assistant');
+            if (data.products) displayProducts(data.products);
+            if (data.action_buttons) displayActionButtons(data.action_buttons);
+            else setInputState(true);
 
         } catch (error) {
             console.error('Error communicating with backend:', error);
@@ -123,10 +103,15 @@ document.addEventListener('DOMContentLoaded', () => {
             setInputState(true);
         }
     }
+    
+    function showChatInterface() {
+        welcomeCard.classList.add('hidden');
+        chatWindow.classList.remove('hidden');
+        chatInputArea.classList.remove('hidden');
+    }
 
     async function startNewConversation() {
         try {
-            // Clear the current session on the backend
             if (sessionId) {
                 await fetch('/new-session', {
                     method: 'POST',
@@ -135,17 +120,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
             
-            // Clear the UI
             chatMessagesDiv.innerHTML = '';
             productRecommendationsDiv.innerHTML = '';
             actionButtonsContainer.innerHTML = '';
-            
-            // Clear session storage
             localStorage.removeItem('aiAssistantSessionId');
             sessionId = null;
             
-            // Start the initial greeting
-            sendMessage("");
+            showChatInterface();
+            sendMessage(null); // Trigger initial greeting
 
         } catch (error) {
             console.error('Error starting new conversation:', error);
@@ -153,117 +135,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function startShopping() {
-        // Add smooth transition effect
-        welcomeCard.style.transform = 'scale(0.95)';
-        welcomeCard.style.opacity = '0';
-        
-        setTimeout(() => {
-            welcomeCard.classList.add('hidden');
-            dashboardPanel.classList.add('hidden');
-            chatWindow.classList.remove('hidden');
-            chatInputArea.classList.remove('hidden');
-            
-            // Reset transform and opacity
-            welcomeCard.style.transform = '';
-            welcomeCard.style.opacity = '';
-            
-            // Start the conversation
-            startNewConversation();
-        }, 200);
-    }
-
-    function showDashboard() {
-        // Add smooth transition effect
-        if (!welcomeCard.classList.contains('hidden')) {
-            welcomeCard.style.transform = 'scale(0.95)';
-            welcomeCard.style.opacity = '0';
-        }
-        if (!chatWindow.classList.contains('hidden')) {
-            chatWindow.style.transform = 'scale(0.95)';
-            chatWindow.style.opacity = '0';
-        }
-        if (!chatInputArea.classList.contains('hidden')) {
-            chatInputArea.style.transform = 'scale(0.95)';
-            chatInputArea.style.opacity = '0';
-        }
-        
-        setTimeout(() => {
-            welcomeCard.classList.add('hidden');
-            chatWindow.classList.add('hidden');
-            chatInputArea.classList.add('hidden');
-            dashboardPanel.classList.remove('hidden');
-            
-            // Reset transforms and opacity
-            welcomeCard.style.transform = '';
-            welcomeCard.style.opacity = '';
-            chatWindow.style.transform = '';
-            chatWindow.style.opacity = '';
-            chatInputArea.style.transform = '';
-            chatInputArea.style.opacity = '';
-        }, 200);
-    }
-
-    function hideDashboard() {
-        // Show welcome card, hide dashboard and chat
-        dashboardPanel.classList.add('hidden');
-        chatWindow.classList.add('hidden');
-        chatInputArea.classList.add('hidden');
-        welcomeCard.classList.remove('hidden');
-    }
-
-    function trackOrder() {
-        appendMessage('I\'d be happy to help you track your order! Please provide your order number or email address.', 'assistant');
-        showChatInterface();
-    }
-
-    function viewCollections() {
-        appendMessage('Here are our featured collections! What type of jewelry are you looking for today?', 'assistant');
-        showChatInterface();
-    }
-
-    function viewWishlist() {
-        appendMessage('Let me show you your saved items. You can also add new items to your wishlist while browsing!', 'assistant');
-        showChatInterface();
-    }
-
-    function viewHistory() {
-        appendMessage('Here\'s your browsing and purchase history. Is there anything specific you\'d like to revisit?', 'assistant');
-        showChatInterface();
-    }
-
-    function showChatInterface() {
-        // Hide dashboard and show chat interface
-        dashboardPanel.classList.add('hidden');
-        welcomeCard.classList.add('hidden');
-        chatWindow.classList.remove('hidden');
-        chatInputArea.classList.remove('hidden');
-        
-        // Focus on input
-        setInputState(true);
-    }
-
-    // Event Listeners
-    sendButton.addEventListener('click', () => {
-        if (userInput.value.trim()) {
-            sendMessage(userInput.value);
-        }
-    });
-
-    userInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter' && !userInput.disabled && userInput.value.trim()) {
-            event.preventDefault();
+    sendButton.addEventListener('click', () => sendMessage(userInput.value));
+    userInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !userInput.disabled) {
+            e.preventDefault();
             sendMessage(userInput.value);
         }
     });
     
     newConversationButton.addEventListener('click', startNewConversation);
-    dashboardButton.addEventListener('click', showDashboard);
-    closeDashboard.addEventListener('click', hideDashboard);
+    dashboardButton.addEventListener('click', () => {
+        window.open('/staff/dashboard', '_blank');
+    });
 
-    // Show welcome card by default
-    welcomeCard.classList.remove('hidden');
-    dashboardPanel.classList.add('hidden');
-    chatWindow.classList.add('hidden');
-    chatInputArea.classList.add('hidden');
+    // Add a click listener to the welcome card to start the conversation
+    welcomeCard.addEventListener('click', startNewConversation);
 });
