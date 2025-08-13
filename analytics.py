@@ -491,13 +491,23 @@ class AnalyticsEngine:
             product_metrics = self.get_product_metrics(period)
             user_behavior_metrics = self.get_user_behavior_metrics(period)
             
-            return {
+            # Convert to dict and handle datetime serialization
+            dashboard_data = {
                 "conversation_metrics": asdict(conversation_metrics),
                 "product_metrics": asdict(product_metrics),
                 "user_behavior_metrics": asdict(user_behavior_metrics),
                 "generated_at": datetime.utcnow().isoformat(),
                 "period": period.value
             }
+            
+            # Fix datetime serialization issues
+            for metric_type in ["conversation_metrics", "product_metrics", "user_behavior_metrics"]:
+                if metric_type in dashboard_data:
+                    for key, value in dashboard_data[metric_type].items():
+                        if isinstance(value, datetime):
+                            dashboard_data[metric_type][key] = value.isoformat()
+            
+            return dashboard_data
             
         except Exception as e:
             logger.error(f"Error getting comprehensive dashboard data: {e}")

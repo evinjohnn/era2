@@ -11,6 +11,7 @@ import time
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Global product catalog - will be updated by main application
 PRODUCT_CATALOG = []
 
 class VectorDatabase:
@@ -68,11 +69,14 @@ class VectorDatabase:
         products = []
         if results['ids'] and results['ids'][0]:
             for i, product_id in enumerate(results['ids'][0]):
-                original_product = next((p for p in PRODUCT_CATALOG if p['id'] == product_id), None)
+                # Find the original product from the current catalog
+                original_product = next((p for p in PRODUCT_CATALOG if p.get('id') == product_id), None)
                 if original_product:
                     distance = results['distances'][0][i]
-                    original_product['similarity_score'] = 1 - distance
-                    products.append(original_product)
+                    # Create a clean copy to avoid SQLAlchemy issues
+                    clean_product = {k: v for k, v in original_product.items() if not k.startswith('_')}
+                    clean_product['similarity_score'] = 1 - distance
+                    products.append(clean_product)
         return products
 
 vector_db = None
@@ -84,8 +88,18 @@ def get_vector_database() -> VectorDatabase:
 
 def initialize_vector_database_with_products(products: List[Dict[str, Any]]) -> VectorDatabase:
     global PRODUCT_CATALOG
-    PRODUCT_CATALOG = products
+    # Update the global catalog with clean dictionaries
+    PRODUCT_CATALOG = []
+    for product in products:
+        if hasattr(product, '__dict__'):
+            # Remove SQLAlchemy internal state
+            clean_product = {k: v for k, v in product.__dict__.items() 
+                           if not k.startswith('_')}
+            PRODUCT_CATALOG.append(clean_product)
+        else:
+            PRODUCT_CATALOG.append(product)
+    
     vdb = get_vector_database()
-    if vdb.collection.count() == 0 and products:
-        vdb.add_products(products)
+    if vdb.collection.count() == 0 and PRODUCT_CATALOG:
+        vdb.add_products(PRODUCT_CATALOG)
     return vdb

@@ -4,52 +4,57 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Joxy - Jewelry Assistant</title>
+   
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lora:wght@400;500;600&display=swap" rel="stylesheet">
+    
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+    
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="kiosk-container">
-        <header>
-            <img src="/static/logo.png" alt="Joxy Logo" class="logo">
-            <h1>Joxy AI Assistant</h1>
-            <div class="header-actions">
-                <button id="dashboardButton" class="icon-button" title="Dashboard">
-                    <span class="material-symbols-outlined">dashboard</span>
-                </button>
-                <button id="newConversationButton" class="icon-button" title="Start New Conversation">
-                    <span class="material-symbols-outlined">refresh</span>
-                </button>
-            </div>
-        </header>
-       
-        <div id="welcomeCard" class="welcome-card">
-             <div class="welcome-text">
-                <h1 id="greeting-text">Welcome!</h1>
-                <p>I'm Joxy, your personal guide to finding the perfect jewelry.</p>
-            </div>
-            <div class="bot-avatar-container">
-                <img src="/static/logo.png" alt="Joxy, the AI assistant">
-            </div>
+        
+        <div class="menu-container">
+            <input id="checkbox" type="checkbox">
+            <label class="toggle" for="checkbox">
+                <div id="bar1" class="bars"></div>
+                <div id="bar2" class="bars"></div>
+                <div id="bar3" class="bars"></div>
+            </label>
+            <nav class="menu-panel">
+                <ul>
+                    <li><a href="javascript:void(0);" id="reset-conversation-btn">Reset Conversation</a></li>
+                    <li><a href="/staff/dashboard" target="_blank">Staff Dashboard</a></li>
+                    <li><a href="javascript:void(0);">Version 2.1</a></li>
+                </ul>
+            </nav>
+            <div class="overlay" id="overlay"></div>
         </div>
         
-        <div id="chatWindow" class="chat-window hidden">
-            <div id="chat-messages" class="chat-messages"></div>
+        <div id="chat-messages" class="chat-messages">
+            <!-- Initial view is dynamically added by script.js if needed -->
         </div>
        
-        <div id="chatInputArea" class="chat-input-area hidden">
-            <div id="product-recommendations" class="product-recommendations"></div>
-            <div id="action-buttons-container" class="action-buttons-container"></div>
-            <div class="input-wrapper">
+        <div class="chat-input-area" id="chat-input-area">
+            <div class="interactive-bubbles" id="interactive-bubbles">
+                <!-- Interactive bubbles will be inserted here by script.js -->
+            </div>
+            <div class="input-wrapper" id="input-wrapper">
                 <input type="text" id="userInput" placeholder="Type your answer..." autofocus>
+                <button id="micButton" class="icon-button" aria-label="Use Microphone">
+                    <span class="material-symbols-outlined">mic</span>
+                </button>
                 <button id="sendButton" class="icon-button" aria-label="Send Message">
                     <span class="material-symbols-outlined">send</span>
                 </button>
             </div>
         </div>
     </div>
-    <script src="/static/script.js"></script>
+   
+    <script src="/static/script.js" defer></script>
 </body>
 </html>

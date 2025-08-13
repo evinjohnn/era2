@@ -11,13 +11,107 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { background: #f4f7f9; } /* Override kiosk background for dashboard */
+        
+        .period-selector {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .period-selector select {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 1rem;
+        }
+        
+        .refresh-btn {
+            background: #8C4A4A;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .refresh-btn:hover {
+            background: #A1665E;
+        }
+        
+        .refresh-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .status-live { background: #4CAF50; }
+        .status-error { background: #f44336; }
+        .status-loading { background: #ff9800; }
+        
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+            border-left: 4px solid #f44336;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #8C4A4A;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .last-updated {
+            font-size: 0.8rem;
+            color: #666;
+            text-align: right;
+            margin-top: 0.5rem;
+        }
     </style>
 </head>
 <body class="dashboard-body">
     <div class="dashboard-container">
         <div class="dashboard-card full-width">
             <h2>Joxy AI Assistant - Performance Dashboard</h2>
+            <div class="period-selector">
+                <label for="period-select">Time Period:</label>
+                <select id="period-select">
+                    <option value="last_hour">Last Hour</option>
+                    <option value="last_day" selected>Last 24 Hours</option>
+                    <option value="last_week">Last Week</option>
+                    <option value="last_month">Last Month</option>
+                </select>
+                <button id="refresh-btn" class="refresh-btn">
+                    <span id="refresh-text">Refresh Data</span>
+                    <span id="refresh-spinner" class="loading-spinner" style="display: none;"></span>
+                </button>
+                <span id="status-indicator" class="status-indicator status-live"></span>
+                <span id="status-text">Live</span>
+            </div>
         </div>
+
+        <!-- Error Message Container -->
+        <div id="error-container" style="display: none;" class="error-message"></div>
 
         <!-- Conversation Metrics -->
         <div class="dashboard-card">
@@ -35,6 +129,11 @@
             <p id="handoff-rate" class="metric">--%</p>
             <p class="metric-label">Sessions requiring human help</p>
         </div>
+        <div class="dashboard-card">
+            <h2>Active Sessions</h2>
+            <p id="active-sessions" class="metric">--</p>
+            <p class="metric-label">Currently active conversations</p>
+        </div>
 
         <!-- Peak Hours Chart -->
         <div class="dashboard-card full-width">
@@ -42,6 +141,7 @@
             <div class="chart-container">
                 <canvas id="peakHoursChart"></canvas>
             </div>
+            <div class="last-updated" id="chart-updated">Last updated: --</div>
         </div>
 
         <!-- Product Metrics -->
@@ -49,8 +149,8 @@
             <h2>Top Recommended Products</h2>
             <div class="table-container">
                 <table id="top-products-table">
-                    <thead><tr><th>Product Name</th><th>Count</th></tr></thead>
-                    <tbody><tr><td colspan="2">Loading...</td></tr></tbody>
+                    <thead><tr><th>Product Name</th><th>Count</th><th>Avg Score</th></tr></thead>
+                    <tbody><tr><td colspan="3">Loading...</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -67,61 +167,189 @@
             </div>
         </div>
 
+        <!-- Additional Metrics -->
+        <div class="dashboard-card">
+            <h2>Message Statistics</h2>
+            <div id="message-stats">
+                <p><strong>Total Messages:</strong> <span id="total-messages">--</span></p>
+                <p><strong>User Messages:</strong> <span id="user-messages">--</span></p>
+                <p><strong>Assistant Messages:</strong> <span id="assistant-messages">--</span></p>
+                <p><strong>Avg Messages/Session:</strong> <span id="avg-messages-per-session">--</span></p>
+            </div>
+        </div>
+
+        <div class="dashboard-card">
+            <h2>Recommendation Stats</h2>
+            <div id="recommendation-stats">
+                <p><strong>Total Recommendations:</strong> <span id="total-recommendations">--</span></p>
+                <p><strong>Unique Products:</strong> <span id="unique-products">--</span></p>
+                <p><strong>Avg Recommendations/Session:</strong> <span id="avg-recommendations-per-session">--</span></p>
+            </div>
+        </div>
     </div>
 
     <script>
+        let currentCharts = {};
+        let lastUpdateTime = null;
+        let autoRefreshInterval = null;
+
         document.addEventListener('DOMContentLoaded', () => {
-            fetchDashboardData();
+            initializeDashboard();
+            setupEventListeners();
         });
 
+        function setupEventListeners() {
+            const periodSelect = document.getElementById('period-select');
+            const refreshBtn = document.getElementById('refresh-btn');
+            
+            periodSelect.addEventListener('change', () => {
+                fetchDashboardData();
+            });
+            
+            refreshBtn.addEventListener('click', () => {
+                fetchDashboardData();
+            });
+        }
+
+        function initializeDashboard() {
+            fetchDashboardData();
+            // Auto-refresh every 5 minutes
+            autoRefreshInterval = setInterval(fetchDashboardData, 5 * 60 * 1000);
+        }
+
         async function fetchDashboardData() {
+            const period = document.getElementById('period-select').value;
+            const refreshBtn = document.getElementById('refresh-btn');
+            const refreshText = document.getElementById('refresh-text');
+            const refreshSpinner = document.getElementById('refresh-spinner');
+            const statusIndicator = document.getElementById('status-indicator');
+            const statusText = document.getElementById('status-text');
+            const errorContainer = document.getElementById('error-container');
+            
             try {
-                const response = await fetch('/staff/api/dashboard-data');
-                if (!response.ok) throw new Error('Failed to fetch dashboard data');
+                // Show loading state
+                refreshBtn.disabled = true;
+                refreshText.style.display = 'none';
+                refreshSpinner.style.display = 'inline-block';
+                statusIndicator.className = 'status-indicator status-loading';
+                statusText.textContent = 'Loading...';
+                errorContainer.style.display = 'none';
+                
+                const response = await fetch(`/staff/api/analytics/${period}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
-
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                // Update dashboard with real data
                 populateConversationMetrics(data.conversation_metrics);
-                createPeakHoursChart(data.user_behavior_metrics.peak_hours);
                 populateProductMetrics(data.product_metrics);
-
+                createPeakHoursChart(data.user_behavior_metrics.peak_hours);
+                
+                // Update status
+                statusIndicator.className = 'status-indicator status-live';
+                statusText.textContent = 'Live';
+                lastUpdateTime = new Date();
+                updateLastUpdated();
+                
             } catch (error) {
                 console.error("Error fetching dashboard data:", error);
-                // Display error state on the dashboard
+                
+                // Show error state
+                statusIndicator.className = 'status-indicator status-error';
+                statusText.textContent = 'Error';
+                errorContainer.style.display = 'block';
+                errorContainer.innerHTML = `
+                    <strong>Error loading dashboard data:</strong> ${error.message}
+                    <br><small>Please check your connection and try again.</small>
+                `;
+                
+            } finally {
+                // Reset loading state
+                refreshBtn.disabled = false;
+                refreshText.style.display = 'inline';
+                refreshSpinner.style.display = 'none';
+            }
+        }
+
+        function updateLastUpdated() {
+            if (lastUpdateTime) {
+                const elements = document.querySelectorAll('.last-updated');
+                elements.forEach(element => {
+                    element.textContent = `Last updated: ${lastUpdateTime.toLocaleTimeString()}`;
+                });
             }
         }
 
         function populateConversationMetrics(metrics) {
-            document.getElementById('total-sessions').textContent = metrics.total_sessions;
-            document.getElementById('avg-duration').textContent = `${metrics.average_session_duration.toFixed(1)}s`;
-            document.getElementById('handoff-rate').textContent = `${(metrics.handoff_rate * 100).toFixed(1)}%`;
+            document.getElementById('total-sessions').textContent = metrics.total_sessions || 0;
+            document.getElementById('avg-duration').textContent = `${(metrics.average_session_duration || 0).toFixed(1)}s`;
+            document.getElementById('handoff-rate').textContent = `${((metrics.handoff_rate || 0) * 100).toFixed(1)}%`;
+            document.getElementById('active-sessions').textContent = metrics.active_sessions || 0;
+            
+            // Additional metrics
+            document.getElementById('total-messages').textContent = metrics.total_messages || 0;
+            document.getElementById('user-messages').textContent = metrics.user_messages || 0;
+            document.getElementById('assistant-messages').textContent = metrics.assistant_messages || 0;
+            document.getElementById('avg-messages-per-session').textContent = (metrics.average_messages_per_session || 0).toFixed(1);
+            
+            document.getElementById('total-recommendations').textContent = metrics.products_recommended || 0;
+            document.getElementById('avg-recommendations-per-session').textContent = (metrics.average_recommendations_per_session || 0).toFixed(1);
         }
         
         function populateProductMetrics(metrics) {
             // Top Products Table
             const topProductsTable = document.querySelector('#top-products-table tbody');
             topProductsTable.innerHTML = '';
-            metrics.top_recommended_products.forEach(product => {
+            
+            if (metrics.top_recommended_products && metrics.top_recommended_products.length > 0) {
+                metrics.top_recommended_products.forEach(product => {
+                    const row = topProductsTable.insertRow();
+                    row.insertCell(0).textContent = product.product_name || 'Unknown Product';
+                    row.insertCell(1).textContent = product.recommendation_count || 0;
+                    row.insertCell(2).textContent = (product.average_similarity_score || 0).toFixed(2);
+                });
+            } else {
                 const row = topProductsTable.insertRow();
-                row.insertCell(0).textContent = product.product_name;
-                row.insertCell(1).textContent = product.recommendation_count;
-            });
+                row.insertCell(0).textContent = 'No data available';
+                row.insertCell(1).textContent = '--';
+                row.insertCell(2).textContent = '--';
+            }
+
+            // Update unique products count
+            document.getElementById('unique-products').textContent = metrics.unique_products_recommended || 0;
 
             // Category Chart
-            createPieChart('categoryChart', metrics.category_breakdown, 'Recommendations by Category');
+            if (metrics.category_breakdown && Object.keys(metrics.category_breakdown).length > 0) {
+                createPieChart('categoryChart', metrics.category_breakdown, 'Recommendations by Category');
+            }
             
             // Price Range Chart
-            createBarChart('priceRangeChart', metrics.price_range_breakdown, 'Recommendations by Price Range');
+            if (metrics.price_range_breakdown && Object.keys(metrics.price_range_breakdown).length > 0) {
+                createBarChart('priceRangeChart', metrics.price_range_breakdown, 'Recommendations by Price Range');
+            }
         }
 
         function createPeakHoursChart(peakHoursData) {
             const ctx = document.getElementById('peakHoursChart').getContext('2d');
-            new Chart(ctx, {
+            
+            // Destroy existing chart if it exists
+            if (currentCharts.peakHours) {
+                currentCharts.peakHours.destroy();
+            }
+            
+            currentCharts.peakHours = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
                     datasets: [{
                         label: 'Conversations per Hour',
-                        data: peakHoursData,
+                        data: peakHoursData || Array(24).fill(0),
                         borderColor: 'rgba(140, 74, 74, 0.8)',
                         backgroundColor: 'rgba(140, 74, 74, 0.1)',
                         fill: true,
@@ -133,6 +361,12 @@
                     maintainAspectRatio: false,
                     scales: {
                         y: { beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
                     }
                 }
             });
@@ -140,7 +374,13 @@
 
         function createPieChart(canvasId, data, title) {
             const ctx = document.getElementById(canvasId).getContext('2d');
-            new Chart(ctx, {
+            
+            // Destroy existing chart if it exists
+            if (currentCharts[canvasId]) {
+                currentCharts[canvasId].destroy();
+            }
+            
+            currentCharts[canvasId] = new Chart(ctx, {
                 type: 'pie',
                 data: {
                     labels: Object.keys(data),
@@ -148,7 +388,8 @@
                         label: title,
                         data: Object.values(data),
                         backgroundColor: [
-                            '#8C4A4A', '#A1665E', '#B68272', '#CC9E86', '#E1B99A', '#F5D5AE'
+                            '#8C4A4A', '#A1665E', '#B68272', '#CC9E86', '#E1B99A', '#F5D5AE',
+                            '#D4A574', '#E6C592', '#F4D4A6', '#F5E6B3', '#F0F0F0', '#E8E8E8'
                         ],
                         hoverOffset: 4
                     }]
@@ -157,7 +398,11 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: 'right' }
+                        legend: { position: 'right' },
+                        title: {
+                            display: true,
+                            text: title
+                        }
                     }
                 }
             });
@@ -165,7 +410,13 @@
         
         function createBarChart(canvasId, data, title) {
             const ctx = document.getElementById(canvasId).getContext('2d');
-            new Chart(ctx, {
+            
+            // Destroy existing chart if it exists
+            if (currentCharts[canvasId]) {
+                currentCharts[canvasId].destroy();
+            }
+            
+            currentCharts[canvasId] = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: Object.keys(data),
@@ -173,13 +424,19 @@
                         label: title,
                         data: Object.values(data),
                         backgroundColor: '#A1665E',
+                        borderColor: '#8C4A4A',
+                        borderWidth: 1
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false }
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: title
+                        }
                     },
                     scales: {
                         y: { beginAtZero: true }
@@ -188,6 +445,12 @@
             });
         }
 
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+        });
     </script>
 </body>
 </html>
