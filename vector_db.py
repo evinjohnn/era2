@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 PRODUCT_CATALOG = []
 
 class VectorDatabase:
-    def __init__(self, persist_directory: str = "./chroma_db"):
+    
+    def __init__(self, persist_directory: str = os.getenv("CHROMA_DB_PATH", "./chroma_db")):
         self.persist_directory = persist_directory
         self.collection_name = "jewelry_products"
         self.client = chromadb.PersistentClient(path=persist_directory, settings=Settings(anonymized_telemetry=False))
