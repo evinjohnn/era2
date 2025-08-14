@@ -4,7 +4,7 @@ python-dotenv
 groq
 gunicorn 
 faker
-pinecone-client
+pinecone
 # Vector Database and RAG Dependencies
 chromadb
 sentence-transformers
