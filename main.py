@@ -42,28 +42,22 @@ async def startup_event():
         products_from_db = db_manager.get_all_products(db)
         db.close()
         
-        # Convert SQLAlchemy objects to plain dictionaries
         PRODUCT_CATALOG = []
         for product in products_from_db:
-            if hasattr(product, '__dict__'):
-                # Remove SQLAlchemy internal state
-                product_dict = {k: v for k, v in product.__dict__.items() 
-                              if not k.startswith('_')}
-                PRODUCT_CATALOG.append(product_dict)
-            else:
-                # If it's already a dict, use it directly
-                PRODUCT_CATALOG.append(product)
+            product_dict = {k: v for k, v in product.__dict__.items() if not k.startswith('_')}
+            PRODUCT_CATALOG.append(product_dict)
                 
         if PRODUCT_CATALOG:
-            initialize_vector_database_with_products(PRODUCT_CATALOG)
+            # IMPORTANT: This now ONLY initializes the connection, it doesn't re-index.
+            # The one-time indexing should be done via a separate script or build command.
             rag_system = get_rag_system()
+            # This line ensures the global catalog in vector_db.py is set for fallback searches
+            get_vector_database().PRODUCT_CATALOG = PRODUCT_CATALOG
             logging.info(f"Application startup complete with RAG system. Loaded {len(PRODUCT_CATALOG)} products.")
-            logging.info(f"Available endpoints: /chat, /products/new-arrivals, /products/categories, /products/category, /analytics/track")
         else:
             logging.error("No products found in the database. Recommendations will fail.")
     else:
         logging.critical("DATABASE NOT READY. Application startup failed.")
-
 # --- Pydantic Models ---
 class ChatRequest(BaseModel):
     session_id: Optional[str] = None
