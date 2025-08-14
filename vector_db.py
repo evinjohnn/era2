@@ -1,9 +1,9 @@
-# /vector_db.py (NEW AND IMPROVED VERSION)
+# /vector_db.py (CORRECTED VERSION)
 import os
 import logging
 from typing import List, Dict, Any, Optional
 from sentence_transformers import SentenceTransformer
-from pinecone import Pinecone
+from pinecone import Pinecone, ServerlessSpec
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -14,21 +14,36 @@ PRODUCT_CATALOG = []
 class VectorDatabase:
     def __init__(self):
         self.api_key = os.getenv("PINECONE_API_KEY")
-        self.host = os.getenv("PINECONE_HOST") # We now use PINECONE_HOST
         self.index_name = "joxy-retail"
         self.pinecone = None
         self.index = None
         
-        if not self.api_key or not self.host:
-            logger.error("PINECONE_API_KEY and PINECONE_HOST environment variables must be set.")
+        if not self.api_key:
+            logger.error("PINECONE_API_KEY environment variable must be set.")
             return
 
         try:
             self.pinecone = Pinecone(api_key=self.api_key)
-            self.index = self.pinecone.Index(host=self.host) # Connect using the host
+            
+            # Check if index exists, create if not
+            if self.index_name not in self.pinecone.list_indexes().names():
+                logger.info(f"Creating new Pinecone index: {self.index_name}")
+                self.pinecone.create_index(
+                    name=self.index_name,
+                    dimension=384,  # Based on all-MiniLM-L6-v2 model
+                    metric='cosine',
+                    spec=ServerlessSpec(
+                        cloud='aws',
+                        region='us-east-1'
+                    )
+                )
+
+            self.index = self.pinecone.Index(self.index_name)
             logger.info(f"Pinecone client initialized. Index stats: {self.index.describe_index_stats()}")
+            
             logger.info("Loading embedding model...")
             self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+
         except Exception as e:
             logger.error(f"Failed to initialize Pinecone: {e}")
 
@@ -41,7 +56,6 @@ class VectorDatabase:
             logger.warning("Pinecone index not available or no products to add.")
             return
         
-        # Check if products already exist to avoid re-indexing
         if self.index.describe_index_stats().get('total_vector_count', 0) >= len(products):
             logger.info("Vector database already appears to be populated. Skipping addition.")
             return
@@ -54,15 +68,9 @@ class VectorDatabase:
             doc_text = self.create_product_text_for_embedding(product)
             embedding = self.embedding_model.encode(doc_text).tolist()
             
-            metadata = {
-                'name': product.get('name', ''),
-                'category': product.get('category', ''),
-                'price': product.get('price', 0.0),
-                'metal': product.get('metal', '')
-            }
-            vectors_to_upsert.append((product['id'], embedding, metadata))
+            metadata = {key: value for key, value in product.items() if isinstance(value, (str, int, float, bool, list))}
+            vectors_to_upsert.append({'id': product['id'], 'values': embedding, 'metadata': metadata})
 
-        # Upsert in batches
         batch_size = 100
         for i in range(0, len(vectors_to_upsert), batch_size):
             batch = vectors_to_upsert[i:i + batch_size]
@@ -71,34 +79,36 @@ class VectorDatabase:
         
         logger.info(f"Successfully added {len(vectors_to_upsert)} products.")
 
-    def hybrid_search(self, query: str, preferences: Dict[str, Any], top_k: int = 5) -> List[Dict[str, Any]]:
+    def hybrid_search(self, query: str, preferences: Dict[str, Any], top_k: int = 15) -> List[Dict[str, Any]]:
         if not self.index:
             return []
             
         filters = {}
         if preferences.get('category'): filters['category'] = preferences['category']
         if preferences.get('metal'): filters['metal'] = preferences['metal']
-        if preferences.get('budget_max'): filters['price'] = {"$lte": preferences['budget_max']}
+        if preferences.get('budget_max'): filters['price'] = {"$lte": float(preferences['budget_max'])}
         
         query_embedding = self.embedding_model.encode(query).tolist()
         
-        results = self.index.query(
-            vector=query_embedding,
-            top_k=top_k,
-            filter=filters if filters else None,
-            include_metadata=False
-        )
-        
-        products = []
-        if results and results['matches']:
-            for match in results['matches']:
-                product_id = match['id']
-                original_product = next((p for p in PRODUCT_CATALOG if p.get('id') == product_id), None)
-                if original_product:
-                    clean_product = {k: v for k, v in original_product.items() if not k.startswith('_')}
-                    clean_product['similarity_score'] = match['score']
-                    products.append(clean_product)
-        return products
+        try:
+            results = self.index.query(
+                vector=query_embedding,
+                top_k=top_k,
+                filter=filters if filters else None,
+                include_metadata=True
+            )
+            
+            products = []
+            if results and results.get('matches'):
+                for match in results['matches']:
+                    product_data = match.get('metadata', {})
+                    product_data['id'] = match['id']
+                    product_data['similarity_score'] = match.get('score', 0.0)
+                    products.append(product_data)
+            return products
+        except Exception as e:
+            logger.error(f"Error querying Pinecone: {e}")
+            return []
 
 vector_db = None
 def get_vector_database() -> VectorDatabase:
