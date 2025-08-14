@@ -1,9 +1,9 @@
-# /vector_db.py (CORRECTED VERSION)
+# /vector_db.py (CORRECTED to use ChromaDB)
 import os
 import logging
 from typing import List, Dict, Any, Optional
 from sentence_transformers import SentenceTransformer
-from pinecone import Pinecone, ServerlessSpec
+import chromadb
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -13,102 +13,81 @@ PRODUCT_CATALOG = []
 
 class VectorDatabase:
     def __init__(self):
-        self.api_key = os.getenv("PINECONE_API_KEY")
-        self.index_name = "joxy-retail"
-        self.pinecone = None
-        self.index = None
+        # Use a persistent directory for ChromaDB. This path is crucial for Render disks.
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_db")
+        logger.info(f"Initializing ChromaDB at persistent path: {db_path}")
+        self.client = chromadb.PersistentClient(path=db_path)
+        self.collection_name = "joxy_products"
         
-        if not self.api_key:
-            logger.error("PINECONE_API_KEY environment variable must be set.")
-            return
-
-        try:
-            self.pinecone = Pinecone(api_key=self.api_key)
-            
-            # Check if index exists, create if not
-            if self.index_name not in self.pinecone.list_indexes().names():
-                logger.info(f"Creating new Pinecone index: {self.index_name}")
-                self.pinecone.create_index(
-                    name=self.index_name,
-                    dimension=384,  # Based on all-MiniLM-L6-v2 model
-                    metric='cosine',
-                    spec=ServerlessSpec(
-                        cloud='aws',
-                        region='us-east-1'
-                    )
-                )
-
-            self.index = self.pinecone.Index(self.index_name)
-            logger.info(f"Pinecone client initialized. Index stats: {self.index.describe_index_stats()}")
-            
-            logger.info("Loading embedding model...")
-            self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
-
-        except Exception as e:
-            logger.error(f"Failed to initialize Pinecone: {e}")
+        logger.info("Loading embedding model for ChromaDB...")
+        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
+        
+        logger.info(f"Getting or creating ChromaDB collection: {self.collection_name}")
+        self.collection = self.client.get_or_create_collection(name=self.collection_name)
+        logger.info("ChromaDB client initialized successfully.")
 
     def create_product_text_for_embedding(self, product: Dict[str, Any]) -> str:
         tags = " ".join(product.get('tags', []))
         return f"Product: {product.get('name', '')}. Description: {product.get('description', '')}. Tags: {tags}"
 
     def add_products(self, products: List[Dict[str, Any]]):
-        if not self.index or not products:
-            logger.warning("Pinecone index not available or no products to add.")
+        if not products:
+            logger.warning("No products to add to ChromaDB.")
             return
-        
-        if self.index.describe_index_stats().get('total_vector_count', 0) >= len(products):
+
+        if self.collection.count() >= len(products):
             logger.info("Vector database already appears to be populated. Skipping addition.")
             return
 
-        logger.info(f"Adding {len(products)} products to Pinecone...")
-        vectors_to_upsert = []
-        for product in products:
-            if not product.get('id'): continue
-            
-            doc_text = self.create_product_text_for_embedding(product)
-            embedding = self.embedding_model.encode(doc_text).tolist()
-            
-            metadata = {key: value for key, value in product.items() if isinstance(value, (str, int, float, bool, list))}
-            vectors_to_upsert.append({'id': product['id'], 'values': embedding, 'metadata': metadata})
+        logger.info(f"Adding {len(products)} products to ChromaDB...")
+        
+        ids = [p['id'] for p in products if p.get('id')]
+        documents = [self.create_product_text_for_embedding(p) for p in products if p.get('id')]
+        metadatas = [
+            {key: value for key, value in p.items() if isinstance(value, (str, int, float, bool))}
+            for p in products if p.get('id')
+        ]
 
         batch_size = 100
-        for i in range(0, len(vectors_to_upsert), batch_size):
-            batch = vectors_to_upsert[i:i + batch_size]
-            self.index.upsert(vectors=batch)
+        for i in range(0, len(ids), batch_size):
+            batch_ids = ids[i:i + batch_size]
+            batch_documents = documents[i:i + batch_size]
+            batch_metadatas = metadatas[i:i + batch_size]
+            
+            self.collection.add(
+                ids=batch_ids,
+                documents=batch_documents,
+                metadatas=batch_metadatas
+            )
             logger.info(f"Upserted batch {i//batch_size + 1}")
         
-        logger.info(f"Successfully added {len(vectors_to_upsert)} products.")
+        logger.info(f"Successfully added {len(ids)} products to ChromaDB.")
 
     def hybrid_search(self, query: str, preferences: Dict[str, Any], top_k: int = 15) -> List[Dict[str, Any]]:
-        if not self.index:
-            return []
-            
-        filters = {}
-        if preferences.get('category'): filters['category'] = preferences['category']
-        if preferences.get('metal'): filters['metal'] = preferences['metal']
-        if preferences.get('budget_max'): filters['price'] = {"$lte": float(preferences['budget_max'])}
+        where_clause = {}
+        if preferences.get('category'):
+            where_clause['category'] = preferences['category']
+        if preferences.get('metal'):
+            where_clause['metal'] = preferences['metal']
+        if preferences.get('budget_max'):
+            where_clause['price'] = {"$lte": float(preferences['budget_max'])}
+
+        results = self.collection.query(
+            query_texts=[query],
+            n_results=top_k,
+            where=where_clause if where_clause else None
+        )
         
-        query_embedding = self.embedding_model.encode(query).tolist()
-        
-        try:
-            results = self.index.query(
-                vector=query_embedding,
-                top_k=top_k,
-                filter=filters if filters else None,
-                include_metadata=True
-            )
-            
-            products = []
-            if results and results.get('matches'):
-                for match in results['matches']:
-                    product_data = match.get('metadata', {})
-                    product_data['id'] = match['id']
-                    product_data['similarity_score'] = match.get('score', 0.0)
-                    products.append(product_data)
-            return products
-        except Exception as e:
-            logger.error(f"Error querying Pinecone: {e}")
-            return []
+        products = []
+        if results and results['ids'][0]:
+            for i, product_id in enumerate(results['ids'][0]):
+                original_product = next((p for p in PRODUCT_CATALOG if p.get('id') == product_id), None)
+                if original_product:
+                    clean_product = {k: v for k, v in original_product.items() if not k.startswith('_')}
+                    # Chroma uses distance; convert to similarity score (0 to 1)
+                    clean_product['similarity_score'] = 1 - results['distances'][0][i] 
+                    products.append(clean_product)
+        return products
 
 vector_db = None
 def get_vector_database() -> VectorDatabase:
@@ -121,6 +100,6 @@ def initialize_vector_database_with_products(products: List[Dict[str, Any]]) -> 
     global PRODUCT_CATALOG
     PRODUCT_CATALOG = products
     vdb = get_vector_database()
-    if vdb and vdb.index:
+    if vdb and vdb.collection:
         vdb.add_products(PRODUCT_CATALOG)
     return vdb
