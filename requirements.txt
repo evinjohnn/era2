@@ -4,9 +4,9 @@ python-dotenv
 groq
 gunicorn 
 faker
-pinecone
+pinecone-client
 # Vector Database and RAG Dependencies
-chromadb
+# chromadb  <-- REMOVE THIS LINE
 sentence-transformers
 numpy
 # Database Dependencies
