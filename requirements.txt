@@ -8,7 +8,7 @@ python-dotenv
 groq
 gunicorn 
 faker
-pinecone-client
+pinecone
 # Vector Database and RAG Dependencies
 sentence-transformers
 numpy
