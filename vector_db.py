@@ -1,9 +1,9 @@
-# /vector_db.py (NEW VERSION)
+# /vector_db.py (NEW AND IMPROVED VERSION)
 import os
 import logging
 from typing import List, Dict, Any, Optional
 from sentence_transformers import SentenceTransformer
-from pinecone import Pinecone, ServerlessSpec
+from pinecone import Pinecone
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -14,21 +14,18 @@ PRODUCT_CATALOG = []
 class VectorDatabase:
     def __init__(self):
         self.api_key = os.getenv("PINECONE_API_KEY")
-        self.environment = os.getenv("PINECONE_ENVIRONMENT")
+        self.host = os.getenv("PINECONE_HOST") # We now use PINECONE_HOST
         self.index_name = "joxy-retail"
         self.pinecone = None
         self.index = None
         
-        if not self.api_key or not self.environment:
-            logger.error("PINECONE_API_KEY and PINECONE_ENVIRONMENT must be set.")
+        if not self.api_key or not self.host:
+            logger.error("PINECONE_API_KEY and PINECONE_HOST environment variables must be set.")
             return
 
         try:
             self.pinecone = Pinecone(api_key=self.api_key)
-            if self.index_name not in self.pinecone.list_indexes().names():
-                logger.warning(f"Pinecone index '{self.index_name}' not found. Please create it in the Pinecone console.")
-                # Optionally, you can create it here, but manual creation is safer for free tier.
-            self.index = self.pinecone.Index(self.index_name)
+            self.index = self.pinecone.Index(host=self.host) # Connect using the host
             logger.info(f"Pinecone client initialized. Index stats: {self.index.describe_index_stats()}")
             logger.info("Loading embedding model...")
             self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
@@ -89,7 +86,7 @@ class VectorDatabase:
             vector=query_embedding,
             top_k=top_k,
             filter=filters if filters else None,
-            include_metadata=False # We only need the ID to look up in our catalog
+            include_metadata=False
         )
         
         products = []
