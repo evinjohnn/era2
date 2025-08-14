@@ -1,3 +1,7 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+
 fastapi
 uvicorn
 python-dotenv
@@ -6,7 +10,6 @@ gunicorn
 faker
 pinecone-client
 # Vector Database and RAG Dependencies
-# chromadb  <-- REMOVE THIS LINE
 sentence-transformers
 numpy
 # Database Dependencies
